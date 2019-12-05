@@ -91,10 +91,8 @@ const router = new Router();
 router.register('/', MainPage);
 router.register('/messages', MessagesPage);
 
-// const [backendUrl, websocketUrl] = ['localhost', '127.0.0.1'].includes(window.location.hostname) ?
-//   ['http://localhost:9999', 'ws://localhost:9999/ws'] : ['https://boot-coursar.herokuapp.com', 'ws://boot-coursar.herokuapp.com/ws'];
-
-const [backendUrl, websocketUrl] = ['http://localhost:9999', 'ws://localhost:9999/ws'];
+const [backendUrl, websocketUrl] = ['localhost', '127.0.0.1'].includes(window.location.hostname) ?
+  ['http://localhost:9999', 'ws://localhost:9999/ws'] : ['https://boot-coursar.herokuapp.com', 'wss://boot-coursar.herokuapp.com/ws'];
 
 const api = new Api(`${backendUrl}/api`);
 new Context(document.getElementById('root'), api, router, translator, backendUrl, websocketUrl);
