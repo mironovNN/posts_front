@@ -125,6 +125,7 @@ export default class MessagesPage {
       if (incoming.type === 'message') {
         incomingEl.textContent = `${incoming.content}`;
         this._messagesContainerEl.appendChild(incomingEl);
+        incomingEl.scrollIntoView(false);
       }
     });
 
