@@ -32,4 +32,3 @@ const translations = {
     'error.message_send': 'Can\'t send message',
   }
 };
-

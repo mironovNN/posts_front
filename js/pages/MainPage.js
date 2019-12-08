@@ -1,8 +1,10 @@
-// TODO: remove code duplication
 export default class MainPage {
   constructor(context) {
     this._context = context;
     this._rootEl = context.rootEl();
+    this._firstPostId = 0;
+    this._lastPost = 0;
+    this._postsCount = 5;
   }
 
   init() {
@@ -13,7 +15,6 @@ export default class MainPage {
           <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar-supported-content">
             <span class="navbar-toggler-icon"></span>
           </button>
-
           <div class="collapse navbar-collapse" id="navbar-supported-content">
             <ul class="navbar-nav mr-auto">
               <li class="nav-item active">
@@ -47,15 +48,18 @@ export default class MainPage {
                       </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Submit</button>
-                  </form>
+                  </form>                             
                 </div>
-              </div>
+                </div>
+                <div class="row" data-id="new-posts">
+                </div>
+                <div class="row" data-id="posts-container">
+                </div>              
+            </div>
             </div>
         </div>
-        <div class="row" data-id="posts-container">
-        </div>
+        
       </div>
-      <!-- TODO: https://getbootstrap.com/docs/4.4/components/modal/ -->
       <div class="modal fade" data-id="error-modal" tabindex="-1">
         <div class="modal-dialog">
           <div class="modal-content">
@@ -85,7 +89,7 @@ export default class MainPage {
 
     this._errorModal = $('[data-id=error-modal]'); // jquery
     this._errorMessageEl = this._rootEl.querySelector('[data-id=error-message]');
-
+    this._newPostsEl = this._rootEl.querySelector('[data-id=new-posts]');
     this._postsContainerEl = this._rootEl.querySelector('[data-id=posts-container]');
     this._postCreateFormEl = this._rootEl.querySelector('[data-id=post-edit-form]');
     this._idInputEl = this._postCreateFormEl.querySelector('[data-id=id-input]');
@@ -101,13 +105,13 @@ export default class MainPage {
       const formData = new FormData();
       formData.append('file', file);
       this._context.post('/files/multipart', formData, {},
-        text => {
-          const data = JSON.parse(text);
-          this._mediaNameInputEl.value = data.name;
-        },
-        error => {
-          this.showError(error);
-        });
+          text => {
+            const data = JSON.parse(text);
+            this._mediaNameInputEl.value = data.name;
+          },
+          error => {
+            this.showError(error);
+          });
     });
     this._postCreateFormEl.addEventListener('submit', evt => {
       evt.preventDefault();
@@ -117,38 +121,62 @@ export default class MainPage {
         media: this._mediaNameInputEl.value || null
       };
       this._context.post('/posts', JSON.stringify(data), {'Content-Type': 'application/json'},
+          text => {
+            this._idInputEl.value = 0;
+            this._contentInputEl.value = '';
+            this._mediaNameInputEl.value = '';
+            this._mediaInputEl.value = '';
+            this.clean();
+            this._lastPost++;
+            this.loadMorePosts(0, this._lastPost);
+            this._newPostsEl.innerHTML = '';
+            this.getFirstPost();
+          },
+          error => {
+            this.showError(error);
+          });
+    });
+    this.loadMorePosts(this._lastPost, this._postsCount);
+    this._lastPost += this._postsCount;
+    this.getFirstPost();
+
+    this.pollNewPosts();
+  }
+
+  getFirstPost() {
+    this._context.get("/posts", {},
         text => {
-          this._idInputEl.value = 0;
-          this._contentInputEl.value = '';
-          this._mediaNameInputEl.value = '';
-          this._mediaInputEl.value = '';
-          this.loadAll();
+          const id = JSON.parse(text);
+          this._firstPostId = id;
         },
         error => {
           this.showError(error);
         });
-    });
-    this.loadAll();
-    this.pollNewPosts();
   }
 
-  loadAll() {
-    this._context.get('/posts', {},
-      text => {
-        const posts = JSON.parse(text);
-        this.rebuildList(posts);
-      },
-      error => {
-        this.showError(error);
-      });
+  clean() {
+    this._postsContainerEl.innerHTML = ``;
   }
 
-  rebuildList(posts) {
-    this._postsContainerEl.innerHTML = '';
+  loadMorePosts(lastPost, step) {
+    const str = "?last=" + lastPost + "&step=" + step;
+    this._context.get("/posts" + str, {},
+        text => {
+          const posts = JSON.parse(text);
+          this.loadNewList(posts);
+        },
+        error => {
+          this.showError(error);
+        });
+  }
+
+  loadNewList(posts) {
+    if (!posts) {
+      return;
+    }
     for (const post of posts) {
       const postEl = document.createElement('div');
       postEl.className = 'col-4';
-
       let postMedia = '';
       if (post.media !== null) {
         if (post.media.endsWith('.png') || post.media.endsWith('.jpg')) {
@@ -194,20 +222,22 @@ export default class MainPage {
       postEl.querySelector('[data-action=like]').addEventListener('click', evt => {
         evt.preventDefault();
         this._context.post(`/posts/${post.id}/likes`, null, {},
-          () => {
-            this.loadAll();
-          }, error => {
-            this.showError(error);
-          });
+            () => {
+              this.clean();
+              this.loadMorePosts(0, this._lastPost);
+            }, error => {
+              this.showError(error);
+            });
       });
       postEl.querySelector('[data-action=dislike]').addEventListener('click', evt => {
         evt.preventDefault();
         this._context.delete(`/posts/${post.id}/likes`, {},
-          () => {
-            this.loadAll();
-          }, error => {
-            this.showError(error);
-          });
+            () => {
+              this.clean();
+              this.loadMorePosts(0, this._lastPost);
+            }, error => {
+              this.showError(error);
+            });
       });
       postEl.querySelector('[data-action=edit]').addEventListener('click', evt => {
         evt.preventDefault();
@@ -219,21 +249,79 @@ export default class MainPage {
       postEl.querySelector('[data-action=remove]').addEventListener('click', evt => {
         evt.preventDefault();
         this._context.delete(`/posts/${post.id}`, {},
-          () => {
-            this.loadAll();
-          }, error => {
-            this.showError(error);
-          });
+            () => {
+              this.clean();
+              this._lastPost--;
+              this.loadMorePosts(0, this._lastPost);
+            }, error => {
+              this.showError(error);
+            });
       });
       this._postsContainerEl.appendChild(postEl);
+    }
+    if (posts) {
+      const loadPostEl = document.createElement('div');
+      loadPostEl.className = 'col-4';
+      loadPostEl.innerHTML = `
+    <div class="card mt-2">
+    <div class="card-body">
+              <div class="col text-center">
+                <a href="#" data-action="upload-posts" class="btn btn-sm btn-primary">Upload more posts</a>
+              </div>
+              </div>
+        </div>`;
+      loadPostEl.querySelector('[data-action=upload-posts]').addEventListener('click', evt => {
+        evt.preventDefault();
+        this._postsContainerEl.removeChild(loadPostEl);
+        this.loadMorePosts(this._lastPost, this._postsCount);
+        this._lastPost += this._postsCount;
+      });
+      this._postsContainerEl.appendChild(loadPostEl);
     }
   }
 
   pollNewPosts() {
     this._timeout = setTimeout(() => {
-      this.loadAll();
+      this.newPostsDetected();
       this.pollNewPosts();
     }, 5000);
+  }
+
+  newPostsDetected() {
+    const str = "?first=" + this._firstPostId;
+    this._context.get("/posts" + str, {},
+        text => {
+          const count = JSON.parse(text);
+          if (count > 0) {
+            this.newPostsAnnotation(count);
+          }
+        },
+        error => {
+          this.showError(error);
+        });
+  }
+
+  newPostsAnnotation(count) {
+    this._newPostsEl.innerHTML = '';
+    const newPostEl = document.createElement('div');
+    newPostEl.className = 'col-4';
+    newPostEl.innerHTML = `
+    <div class="card mt-2">
+    <div class="card-body">
+              <div class="col text-center">
+                <a href="#" data-action="new-posts" class="btn btn-sm btn-primary">Upload ${count} new posts</a>
+              </div>
+              </div>
+        </div>`;
+    newPostEl.querySelector('[data-action=new-posts]').addEventListener('click', evt => {
+      evt.preventDefault();
+      this._newPostsEl.removeChild(newPostEl);
+      this.clean();
+      this._lastPost += count;
+      this.loadMorePosts(0, this._lastPost);
+      this.getFirstPost();
+    });
+    this._newPostsEl.appendChild(newPostEl);
   }
 
   showError(error) {

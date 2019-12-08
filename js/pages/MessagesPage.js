@@ -1,4 +1,3 @@
-// TODO: remove code duplication
 export default class MessagesPage {
   constructor(context) {
     this._context = context;
@@ -15,7 +14,6 @@ export default class MessagesPage {
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar-supported-content">
               <span class="navbar-toggler-icon"></span>
             </button>
-
             <div class="collapse navbar-collapse" id="navbar-supported-content">
               <ul class="navbar-nav mr-auto">
                 <li class="nav-item">
@@ -140,7 +138,7 @@ export default class MessagesPage {
   disconnect() {
     if (this._websocket !== null) {
       try {
-        this._websocket.close(100);
+        this._websocket.close(1000);
         this._websocket = null;
       } catch (e) {
         console.error(e);
